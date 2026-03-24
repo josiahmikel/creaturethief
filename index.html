@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>creaturethief</title>
+    <style>
+        * {
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            position: fixed;
+            font-family: Helvetica, Arial, sans-serif;
+            background: #fff;
+        }
+        .top-left-image {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 160px;
+            pointer-events: none;
+            transition: filter .3s;
+            z-index: 10;
+        }
+        .top-left-image img {
+            width: 100%;
+            display: block;
+        }
+        .top-left-image.blurred {
+            filter: blur(4px);
+        }
+        .pouch {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 160px;
+            height: 160px;
+            background: url('assets/pouch.png') center/contain no-repeat;
+            cursor: pointer;
+            transition: transform .2s, filter .2s;
+            z-index: 20;
+        }
+        .pouch:hover {
+            transform: scale(1.03);
+            filter: drop-shadow(0 0 12px #ffd70080);
+        }
+        .pouch.highlight {
+            transform: scale(1.05);
+            filter: drop-shadow(0 0 16px #ffd700b3);
+        }
+        .sprites-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 30;
+            touch-action: none;
+        }
+        .sprite {
+            position: absolute;
+            width: 64px;
+            height: 64px;
+            background: url('assets/mp3-sprite.png') center/contain no-repeat;
+            cursor: grab;
+            pointer-events: auto;
+        }
+        .sprite:active {
+            cursor: grabbing;
+        }
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0006;
+            backdrop-filter: blur(12px);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity .2s;
+        }
+        .modal.open {
+            opacity: 1;
+            visibility: visible;
+        }
+        .window {
+            background: linear-gradient(135deg, #d4af37, #b8860b);
+            border-radius: 28px;
+            width: auto;
+            min-width: 340px;
+            max-width: 90vw;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 50px -12px #000;
+            border: 3px solid #b87c2e;
+            position: relative;
+        }
+        .window::before {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            border: 2px dashed #ffeb9670;
+            border-radius: 20px;
+            pointer-events: none;
+        }
+        .close-btn {
+            position: absolute;
+            top: 16px;
+            right: 20px;
+            background: #0006;
+            border: none;
+            color: #ffd966;
+            font-size: 20px;
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            backdrop-filter: blur(4px);
+        }
+        .close-btn:hover {
+            background: #000b;
+        }
+        .window-content {
+            padding: 28px 24px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow: hidden;  /* No scrolling inside */
+        }
+        .cd-player {
+            background: #0004;
+            border-radius: 24px;
+            padding: 20px;
+            margin-bottom: 28px;
+            border: 2px solid #ffd70080;
+            width: 100%;
+            max-width: 360px;
+        }
+        .player-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .cd-spin {
+            font-size: 48px;
+            filter: drop-shadow(0 2px 6px #0004);
+        }
+        .cd-spin.playing {
+            animation: spin 1.2s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .now-playing {
+            font-size: 14px;
+            font-weight: 600;
+            color: #2c1a0c;
+            background: #ffffcc;
+            padding: 6px 14px;
+            border-radius: 40px;
+            text-align: center;
+        }
+        .player-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .ctrl-btn {
+            background: #0008;
+            border: none;
+            color: #ffd966;
+            padding: 5px 16px;
+            border-radius: 40px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: monospace;
+        }
+        .ctrl-btn:hover {
+            background: #000c;
+            transform: scale(1.02);
+        }
+        .dropzone {
+            border: 2px dashed #ffd700cc;
+            border-radius: 20px;
+            padding: 20px;
+            text-align: center;
+            cursor: grab;
+        }
+        .dropzone.drag-over {
+            background: #ffd70066;
+            border-color: #ffed4e;
+        }
+        .inventory-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+            justify-items: center;
+            width: 100%;
+            max-width: 360px;
+        }
+        .inventory-slot {
+            width: 90px;
+            height: 90px;
+            background: #0004;
+            border-radius: 18px;
+            border: 2px solid #ffd700cc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .inventory-slot.drag-over {
+            background: #ffd70080;
+            transform: scale(1.02);
+        }
+        .slot-item {
+            width: 70px;
+            height: 70px;
+            background: url('assets/mp3-sprite.png') center/contain no-repeat;
+            cursor: grab;
+            filter: drop-shadow(0 2px 6px #0004);
+            touch-action: none;
+        }
+        .slot-item:active {
+            cursor: grabbing;
+        }
+        .slot-label {
+            position: absolute;
+            bottom: 6px;
+            right: 8px;
+            font-size: 8px;
+            font-weight: 800;
+            background: #000b;
+            color: #ffd966;
+            padding: 2px 6px;
+            border-radius: 20px;
+        }
+        .empty-slot {
+            width: 70px;
+            height: 70px;
+            background: #0003;
+            border-radius: 14px;
+            border: 1px dashed #ffd70080;
+        }
+        .empty-message {
+            text-align: center;
+            color: #2c1a0c;
+            font-weight: 500;
+            padding: 40px 20px;
+            background: #0003;
+            border-radius: 20px;
+            width: 100%;
+        }
+        .toast {
+            position: fixed;
+            bottom: 190px;
+            right: 40px;
+            background: #000d;
+            color: #ffd966;
+            padding: 8px 18px;
+            border-radius: 40px;
+            font-size: 12px;
+            z-index: 20000;
+            animation: fadeOut 2s forwards;
+            pointer-events: none;
+        }
+        @keyframes fadeOut {
+            to {
+                opacity: 0;
+                transform: translateY(-10px);
+                visibility: hidden;
+            }
+        }
+        .drag-clone {
+            position: fixed;
+            width: 64px;
+            height: 64px;
+            background: url('assets/mp3-sprite.png') center/contain no-repeat;
+            filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
+            opacity: 0.8;
+            pointer-events: none;
+            z-index: 20001;
+            transform: translate(-50%, -50%);
+        }
+    </style>
+</head>
+<body>
+<div class="top-left-image" id="topLeftImage"><img src="assets/dontdoit.jpg" alt=""></div>
+<div class="pouch" id="pouch"></div>
+<div class="sprites-container" id="spritesContainer"></div>
+<div class="modal" id="inventoryModal">
+    <div class="window">
+        <button class="close-btn" id="closeModalBtn">✕</button>
+        <div class="window-content" id="modalContent"></div>
+    </div>
+</div>
+
+<script>
+    const SPRITE_SIZE = 64;
+    const INITIAL_COUNT = 5;
+    const MAX_SLOTS = 9;
+
+    const spritesContainer = document.getElementById('spritesContainer');
+    const pouch = document.getElementById('pouch');
+    const modal = document.getElementById('inventoryModal');
+    const modalContent = document.getElementById('modalContent');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const topLeftImage = document.getElementById('topLeftImage');
+
+    let sprites = [];
+    let inventory = new Array(MAX_SLOTS).fill(null);
+    let nextId = 1;
+
+    // Playground drag state
+    let draggingSprite = null;
+    let dragStart = { x: 0, y: 0, left: 0, top: 0 };
+
+    // Inventory drag state
+    let draggingInventoryItem = null;       // { slotIdx, item, startX, startY, clone }
+    let inventoryDragMoved = false;
+
+    let currentAudio = null;
+    let currentTrackItem = null;
+    let isPlaying = false;
+
+    const songs = [
+        { name: "Follow", url: "assets/follow.mp3" },
+        { name: "Redi", url: "assets/redi.mp3" },
+        { name: "148", url: "assets/148.mp3" },
+        { name: "118", url: "assets/118.mp3" },
+        { name: "Eurovision", url: "assets/eurovision.mp3" }
+    ];
+
+    function showToast(msg) {
+        let t = document.createElement('div');
+        t.className = 'toast';
+        t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(() => t.remove(), 2000);
+    }
+
+    function getRect(e) { return e.getBoundingClientRect(); }
+    function getPouchRect() { return getRect(pouch); }
+    function getImageRect() { return getRect(topLeftImage); }
+
+    function overlap(a, b) {
+        return !(b.left > a.right || b.right < a.left || b.top > a.bottom || b.bottom < a.top);
+    }
+
+    function getRandomSafePosition() {
+        const maxX = window.innerWidth - SPRITE_SIZE;
+        const maxY = window.innerHeight - SPRITE_SIZE;
+        const pr = getPouchRect();
+        const ir = getImageRect();
+        for (let i = 0; i < 100; i++) {
+            const x = Math.random() * maxX;
+            const y = Math.random() * maxY;
+            const r = { left: x, right: x + SPRITE_SIZE, top: y, bottom: y + SPRITE_SIZE };
+            if (!overlap(r, pr) && !overlap(r, ir)) return { x, y };
+        }
+        return { x: 10, y: 10 };
+    }
+
+    function addToPouch(sprite) {
+        const r1 = getRect(sprite);
+        const r2 = getPouchRect();
+        if (r1.right > r2.left && r1.left < r2.right && r1.bottom > r2.top && r1.top < r2.bottom) {
+            const songIdx = parseInt(sprite.getAttribute('data-song-idx'));
+            if (!isNaN(songIdx)) {
+                const emptySlot = inventory.findIndex(s => s === null);
+                if (emptySlot !== -1) {
+                    const song = songs[songIdx % songs.length];
+                    inventory[emptySlot] = { id: nextId++, name: song.name, url: song.url, songIdx: songIdx };
+                    showToast(`stole: ${song.name}`);
+                    if (modal.classList.contains('open')) renderInventory();
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    function clampSprite(s) {
+        let l = parseFloat(s.style.left), t = parseFloat(s.style.top);
+        let mx = window.innerWidth - SPRITE_SIZE, my = window.innerHeight - SPRITE_SIZE;
+        s.style.left = Math.min(Math.max(0, l), mx) + 'px';
+        s.style.top = Math.min(Math.max(0, t), my) + 'px';
+    }
+
+    // ----- Playground dragging -----
+    function onSpritePointerDown(e) {
+        const s = e.target.closest('.sprite');
+        if (!s) return;
+        e.preventDefault();
+        draggingSprite = s;
+        dragStart.left = parseFloat(s.style.left);
+        dragStart.top = parseFloat(s.style.top);
+        dragStart.x = e.clientX;
+        dragStart.y = e.clientY;
+        window.addEventListener('pointermove', onSpritePointerMove);
+        window.addEventListener('pointerup', onSpritePointerUp);
+        s.setPointerCapture(e.pointerId);
+    }
+
+    function onSpritePointerMove(e) {
+        if (!draggingSprite) return;
+        e.preventDefault();
+        let nl = dragStart.left + (e.clientX - dragStart.x);
+        let nt = dragStart.top + (e.clientY - dragStart.y);
+        let mx = window.innerWidth - SPRITE_SIZE, my = window.innerHeight - SPRITE_SIZE;
+        draggingSprite.style.left = Math.min(Math.max(0, nl), mx) + 'px';
+        draggingSprite.style.top = Math.min(Math.max(0, nt), my) + 'px';
+        const r1 = getRect(draggingSprite), r2 = getPouchRect();
+        pouch.classList.toggle('highlight', r1.right > r2.left && r1.left < r2.right && r1.bottom > r2.top && r1.top < r2.bottom);
+    }
+
+    function onSpritePointerUp(e) {
+        if (!draggingSprite) return;
+        const added = addToPouch(draggingSprite);
+        if (!added) clampSprite(draggingSprite);
+        else { draggingSprite.remove(); sprites = sprites.filter(s => s !== draggingSprite); }
+        pouch.classList.remove('highlight');
+        window.removeEventListener('pointermove', onSpritePointerMove);
+        window.removeEventListener('pointerup', onSpritePointerUp);
+        if (draggingSprite.releasePointerCapture) draggingSprite.releasePointerCapture(e.pointerId);
+        draggingSprite = null;
+    }
+
+    // ----- Inventory drag with clone -----
+    function onInventoryPointerDown(e) {
+        const target = e.target.closest('.slot-item');
+        if (!target) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const slotIdx = parseInt(target.getAttribute('data-slot-index'));
+        const item = inventory[slotIdx];
+        if (!item) return;
+
+        // Create clone
+        const clone = document.createElement('div');
+        clone.className = 'drag-clone';
+        clone.style.width = '64px';
+        clone.style.height = '64px';
+        clone.style.backgroundImage = "url('assets/mp3-sprite.png')";
+        clone.style.backgroundSize = 'contain';
+        clone.style.backgroundRepeat = 'no-repeat';
+        document.body.appendChild(clone);
+
+        const rect = target.getBoundingClientRect();
+        clone.style.left = (rect.left + rect.width/2) + 'px';
+        clone.style.top = (rect.top + rect.height/2) + 'px';
+
+        draggingInventoryItem = {
+            slotIdx: slotIdx,
+            item: item,
+            startX: e.clientX,
+            startY: e.clientY,
+            clone: clone,
+            targetRect: rect
+        };
+        inventoryDragMoved = false;
+
+        target.style.opacity = '0.5';
+        window.addEventListener('pointermove', onInventoryPointerMove);
+        window.addEventListener('pointerup', onInventoryPointerUp);
+        target.setPointerCapture(e.pointerId);
+    }
+
+    function onInventoryPointerMove(e) {
+        if (!draggingInventoryItem) return;
+        e.preventDefault();
+        const dx = Math.abs(e.clientX - draggingInventoryItem.startX);
+        const dy = Math.abs(e.clientY - draggingInventoryItem.startY);
+        if (dx > 5 || dy > 5) inventoryDragMoved = true;
+
+        // Move clone
+        if (draggingInventoryItem.clone) {
+            draggingInventoryItem.clone.style.left = e.clientX + 'px';
+            draggingInventoryItem.clone.style.top = e.clientY + 'px';
+        }
+    }
+
+    function onInventoryPointerUp(e) {
+        if (!draggingInventoryItem) return;
+
+        // Remove clone
+        if (draggingInventoryItem.clone) draggingInventoryItem.clone.remove();
+
+        const targetElement = document.elementsFromPoint(e.clientX, e.clientY)[0];
+        const dropzone = targetElement.closest('.dropzone');
+        const inventorySlot = targetElement.closest('.inventory-slot');
+
+        // If no movement -> click to play
+        if (!inventoryDragMoved) {
+            // Play track
+            const track = draggingInventoryItem.item;
+            inventory[draggingInventoryItem.slotIdx] = null;
+            playTrack(track);
+        } else {
+            // Handle drop
+            if (dropzone && dropzone.id === 'playerDropzone') {
+                // Drop into CD player
+                const track = draggingInventoryItem.item;
+                inventory[draggingInventoryItem.slotIdx] = null;
+                playTrack(track);
+            }
+            else if (inventorySlot) {
+                const targetIdx = parseInt(inventorySlot.getAttribute('data-slot-index'));
+                if (targetIdx !== draggingInventoryItem.slotIdx) {
+                    if (inventory[targetIdx] === null) {
+                        // Move to empty slot
+                        inventory[targetIdx] = draggingInventoryItem.item;
+                        inventory[draggingInventoryItem.slotIdx] = null;
+                        renderInventory();
+                    } else {
+                        // Swap
+                        const temp = inventory[targetIdx];
+                        inventory[targetIdx] = draggingInventoryItem.item;
+                        inventory[draggingInventoryItem.slotIdx] = temp;
+                        renderInventory();
+                    }
+                }
+            }
+        }
+
+        // Restore original item opacity
+        const originalItem = document.querySelector(`.slot-item[data-slot-index="${draggingInventoryItem.slotIdx}"]`);
+        if (originalItem) originalItem.style.opacity = '';
+
+        window.removeEventListener('pointermove', onInventoryPointerMove);
+        window.removeEventListener('pointerup', onInventoryPointerUp);
+        if (originalItem && originalItem.releasePointerCapture) originalItem.releasePointerCapture(e.pointerId);
+        draggingInventoryItem = null;
+    }
+
+    function onInventoryDoubleClick(e) {
+        const target = e.target.closest('.slot-item');
+        if (!target) return;
+        const slotIdx = parseInt(target.getAttribute('data-slot-index'));
+        const trackItem = inventory[slotIdx];
+        if (trackItem) {
+            inventory[slotIdx] = null;
+            playTrack(trackItem);
+        }
+    }
+
+    // ----- Audio functions -----
+    function ejectTrack() {
+        if (currentTrackItem) {
+            const emptySlot = inventory.findIndex(s => s === null);
+            if (emptySlot !== -1) inventory[emptySlot] = currentTrackItem;
+            else return;
+        }
+        if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+        currentTrackItem = null;
+        isPlaying = false;
+        renderInventory();
+    }
+
+    function playTrack(trackItem) {
+        if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+        try {
+            const audio = new Audio(trackItem.url);
+            audio.play().catch(() => {});
+            currentAudio = audio;
+            currentTrackItem = trackItem;
+            isPlaying = true;
+            audio.onended = () => {
+                isPlaying = false;
+                currentAudio = null;
+                renderInventory();
+            };
+            renderInventory();
+        } catch(e) {}
+    }
+
+    function pausePlay() {
+        if (currentAudio && isPlaying) {
+            currentAudio.pause();
+            isPlaying = false;
+            renderInventory();
+        } else if (currentAudio && !isPlaying) {
+            currentAudio.play();
+            isPlaying = true;
+            renderInventory();
+        }
+    }
+
+    function downloadTrack() {
+        if (currentTrackItem) {
+            const link = document.createElement('a');
+            link.href = currentTrackItem.url;
+            link.download = currentTrackItem.name.replace(/\s/g, '_') + '.mp3';
+            link.click();
+        }
+    }
+
+    // ----- UI Rendering -----
+    function renderInventory() {
+        const filledCount = inventory.filter(i => i !== null).length;
+        if (filledCount === 0 && !currentTrackItem) {
+            modalContent.innerHTML = '<div class="empty-message">You haven\'t stolen any tracks yet.</div>';
+            return;
+        }
+
+        let playerHtml = '';
+        if (currentTrackItem) {
+            playerHtml = `
+                <div class="cd-player">
+                    <div class="player-row">
+                        <div class="cd-spin ${isPlaying ? 'playing' : ''}">💿</div>
+                        <div class="now-playing">${currentTrackItem.name}</div>
+                    </div>
+                    <div class="player-controls">
+                        <button class="ctrl-btn" id="pauseBtn">${isPlaying ? 'pause' : 'resume'}</button>
+                        <button class="ctrl-btn" id="downloadBtn">download</button>
+                        <button class="ctrl-btn" id="ejectBtn">eject</button>
+                    </div>
+                </div>
+            `;
+        } else {
+            playerHtml = `
+                <div class="cd-player">
+                    <div class="dropzone" id="playerDropzone">
+                        <div class="now-playing">drop track here to listen</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        let gridHtml = '<div class="inventory-grid" id="inventoryGrid">';
+        for (let i = 0; i < MAX_SLOTS; i++) {
+            if (inventory[i]) {
+                const item = inventory[i];
+                gridHtml += `
+                    <div class="inventory-slot" data-slot-index="${i}">
+                        <div class="slot-item" data-item-id="${item.id}" data-slot-index="${i}">
+                            <div class="slot-label">${item.name.substring(0, 6)}</div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                gridHtml += `<div class="inventory-slot" data-slot-index="${i}"><div class="empty-slot"></div></div>`;
+            }
+        }
+        gridHtml += '</div>';
+        modalContent.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;width:100%;">${playerHtml}${gridHtml}</div>`;
+
+        if (currentTrackItem) {
+            document.getElementById('pauseBtn')?.addEventListener('click', pausePlay);
+            document.getElementById('downloadBtn')?.addEventListener('click', downloadTrack);
+            document.getElementById('ejectBtn')?.addEventListener('click', ejectTrack);
+        }
+
+        // Attach inventory item handlers
+        document.querySelectorAll('.slot-item').forEach(el => {
+            el.addEventListener('pointerdown', onInventoryPointerDown);
+            el.addEventListener('dblclick', onInventoryDoubleClick);
+        });
+    }
+
+    // ----- Sprite creation -----
+    function createSprite(songIdx) {
+        const div = document.createElement('div');
+        div.className = 'sprite';
+        div.setAttribute('data-song-idx', songIdx);
+        const { x, y } = getRandomSafePosition();
+        div.style.left = x + 'px';
+        div.style.top = y + 'px';
+        div.addEventListener('pointerdown', onSpritePointerDown);
+        div.addEventListener('dragstart', e => e.preventDefault());
+        div.style.touchAction = 'none';
+        spritesContainer.appendChild(div);
+        return div;
+    }
+
+    // ----- Modal controls -----
+    function openModal() { renderInventory(); modal.classList.add('open'); topLeftImage.classList.add('blurred'); }
+    function closeModal() { modal.classList.remove('open'); topLeftImage.classList.remove('blurred'); }
+
+    // ----- Initialization -----
+    for (let i = 0; i < INITIAL_COUNT; i++) sprites.push(createSprite(i % songs.length));
+
+    pouch.addEventListener('click', openModal);
+    closeModalBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+    window.addEventListener('resize', () => sprites.forEach(clampSprite));
+</script>
+</body>
+</html>
